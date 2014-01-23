@@ -1,4 +1,4 @@
-//			Blade.js ->-- underconstruction
+//			Blade.js ->-- under construction
 //			http://bladejs.org
 //			(C) 2014 neo13 (Ahmad Derakhshan) http://github.com/neo13
 //			Under MIT license
@@ -7,18 +7,31 @@
 
 	"use strict";
 
-	//default __ENVironment is nodejs
+	//	default environment is node.js
+	//	supporting environments are node.js and browser
 	var __ENV = "nodejs",
+
+	//	default template root for node.js is templates
+	//	users can pass template roots as arguments to blade objects
 		__ROOT = "./templates";
 
+	//	
+	//	Blade Main Object
+	//		The main object that contains users accessible methods and objects
+	//		If the script is running under node.js environment the Blade will stick itself to `exports` object
+	//		or to `module.exports` object for the sake of legacy `require()` function. If the program is running
+	//		under browser environment the Blade will stick itself to `window` global object.
+	//		[todo]: Choose what kind of storage is used for reading template files. for node.js the default storage
+	//		is file and for browser its DOM, How ever AJAX and pure text must be considered too.
+	//	
 	var blade = function (template_root) {
 		
 		if (typeof template_root === "string") {
 			this.__ROOT = __ROOT = template_root;
 		}
 
-		//this part of code is inspired by underscore.js
-		//using blade.js in browser is some thing that I considered
+		//	This part of code is inspired by underscore.js (C) approach
+		//	[todo]: Browser support is not implemented yet
 		else if (typeof exports !== "undefined") {
 			this.__ROOT = "./templates"; 
 		}
@@ -27,10 +40,9 @@
 		}
 	};
 
-	//this part of code is inspired by underscore.js
+	//	This part of code is inspired by underscore.js (C) approach
 	if (typeof exports !== "undefined") {
 		if (typeof module !== "undefined" && module.exports) {
-			//suport for older versions of require()
 			exports = module.exports = blade;
 		}
 		exports.blade = blade;
@@ -41,42 +53,110 @@
 		__ENV = "browser";
 	}
 
-	//some shortcuts
 	var blade_p = blade.prototype;
 
-	blade_p.__VERSION = "underconstruction";
+	blade_p.__VERSION = "under construction";
 	blade_p.__ENV = __ENV;
 
-	//	for easing job a little i categorized the syntax to 3 major type:
-	//	inheritance_syntax: the most hard one
-	//	substitutional_syntax: easiest just a substitution
-	//	conditional_syntax: second hard
-	var inheritance_syntax = new RegExp([
-			"@extends\\(([\\s\\S]+?)\\)", //extends
-			"@section([\\s\\S]+?)@stop", //section
-			"@include\\(([\\s\\S]+?)\\)", //include
-			"@yield\\(([\\s\\S]+?)\\)" //yield
-		].join("|"), "g");
+	//
+	//	Blade Exception Handler Object (BEH)
+	//		BEHO is created to handle exceptions that take place all over the library and pass them to user as a
+	//		clear and understandable message, template or guide.
+	//		[todo]: needs implementation  
+	//
+	function BEH (exception) {
 
-
-	//			blade exception handler
-	//			this class is used to globaly handel all exceptions in blade template engine and respond accordingly
-	function ExceptionHandler (exception) {
-		//to do
 		this.err = exception;
+
+		this.trace = function () {
+			//helps trace an error to its origin
+		}
 
 		this.render = function () {
 			return this.err;
 		}
 	}
 
-	//this function shall load the requested template and return the raw text
-	//we load templates from file in node __ENVironment and [todo]: from script tags in browsers
-	//[todo]: ajax loading for browsers
-	var loadTemplate = function (template_root, template_name) {
+	//
+	//	Blade Template Primitive Instance
+	//		The main Template Object. The Template objects are created after a successful Compile of passed template
+	//		in Template Making Process.
+	//		Template objects contain a compiled source of template, variable injection tools, and template rendering
+	//		functions. 
+	//		[issue][need_test]: injecting functions to source?
+	//
+	function Template () {
+		this.__injected = false;
+		this.with = function (vars, values) {
+			console.log(typeof vars);
+			if ( typeof vars === "object") {
+				for(var _v in vars) {
+					if( vars[_v] instanceof Function) {
+						this.src = "var "+_v+"="+vars[_v].toString()+";" + this.src;
+					}
+					else {
+						this.src = "var "+_v+"="+JSON.stringify(vars[_v])+";" + this.src;
+					}
+				}
+			}
+			else if (typeof vars === "string") {
+				if( values instanceof Function) {
+						this.src = "var "+vars+"="+values.toString()+";" + this.src;
+				}
+				else {
+					this.src = "var "+vars+"="+JSON.stringify(values)+";" + this.src;							
+				}
+			}
+			else {
+				return new BEH(new Error("Template Error: Invalid argument passed: `"+JSON.stringify(vars)+"`!"));
+			}
+
+			return this;
+		};
+		this.src = "";
+		this.render = function() {
+			try {
+				var _fn = new Function(this.src);
+			}
+			catch (e) {
+				//after test we shall now whats going wrong here and why
+				return false;
+			};
+
+			return _fn();
+		};
+		return this;
+	}
+
+	//
+	//	Blade Template File Manager (BTFM)
+	//		This class is used to manage loading of raw template instances. If the script is running under node.js
+	//		the default storage is FileSystem and for browser environment it is DOM. However the AJAX, cloud storage
+	//		and etc. shall be considered to.
+	//
+	function BTFM (document_root, storage_type) {
+
+		var
+		refineTemplateName = function (template_name) {
+			var secure_template_name = template_name.replace(/[\s\(\)\'\"]+/g, '');
+		},
+
+		resolveTemplateFileName = function (template_name) {
+
+		},
+
+		resolveTemplateTagName = function (template_name) {
+
+		},
+
+		resolveTemplateURL = function (template_name) {
+
+		},
+
+		loadTemplateFile = function (file_name) {
 		
 			if (typeof template_name !== "string" || typeof template_root !== "string") {
-				return new ExceptionHandler(new Error("Invalid Template: " + template_root + "/" + template_name));
+				return new BEH(new Error("Invalid Template: " + template_root + "/" + template_name));
 			}
 
 			if (__ENV === "nodejs") {
@@ -92,69 +172,79 @@
 						return raw_template;
 					}
 					else {
-						return new ExceptionHandler(new Error("Can't read the template or it is empty: " + template_root + "/" + template_name));
+						return new BEH(new Error("Can't read the template or it is empty: " + template_root + "/" + template_name));
 					}
 				}
 				else {
-					return new ExceptionHandler(new Error("Template does not existes: " + template_root + "/" + template_name));
+					return new BEH(new Error("Template does not existes: " + template_root + "/" + template_name));
 				}
 			}
 			else if (__ENV === "browser") {
 				//[todo]
 			}
+
 		},
 
-		extractFeatures = function (syntax, identifier, source) {
+		loadTemplateTag = function (tag_name) {
 
-			//	it contains the feature extracted from source
-			var features = {};
-
-			//	for each type of term which passed by identifier we create a list in feature object
-			for (var id_cnt_exf=0; id_cnt_exf<identifier.length; id_cnt_exf=id_cnt_exf+1) {
-				features[identifier[id_cnt_exf]] = [];
-			}
-
-			//	althogh using replace function makes no logical sense but we use it
-			source.replace(syntax, function (match) {
-
-				//	replace sends arguments according to the syntax we provided to it
-				//	if out sysntax have n capturing group replace passes n+3 arguments
-				//	first argument is the matched part of string [example]: `@extends(base)`
-				//	next n argument are n capturing group values
-				//	[example]: if the extends rule is our second rule of 4 rules then the pased arguments are like this:
-				//	undefined, `base`, undefined, undefined
-				//	the n+2 st argument is offset of matching accurance
-				//	the n+3 st argument is the string it self
-				var args = Array.prototype.slice.call(arguments, 1);
-
-				for (var args_cnt_exf=0; args_cnt_exf<args.length-2; args_cnt_exf=args_cnt_exf+1) {
-					if ( args[args_cnt_exf] ) {
-						features[identifier[args_cnt_exf]].push({
-							'match': match,
-							'placement': args[args_cnt_exf],
-							'offset': args[args.length-2]
-						});
-						break;
-					}
-				}
-
-				return "";
-			});
-
-			return features;
 		},
 
+		getTemplate = function (template_url) {
+
+		};
+
+		this.readTemplate = function (template_name) {
+
+			template_name = refineTemplateName(template_name);
+
+		}
+
+		this.__ROOT = document_root or "./templates";
+		//	[todo]: Other type of storages 
+		this.__STORAGE = "fs";
+
+	}
+
+	//
+	//	Blade Template Compiler Class (BTC)
+	//		BTC is a template compiler that compiles a blade template file to pure `javascript` statements. BTC is
+	//		the core of Blade.js library and its performance is vital for the library.
+	//		[todo]: needs reviews and speed up  
+	//
+	function BTC (file_manager) {
+
+		var 
+		__FM = file_manager,
+
+		conditional_syntax = new RegExp([
+			"@if([\\s\\S]+?)\\)",
+			"@else",
+			"@elseif([\\s\\S]+?)\\)",
+			"@endif",
+			"@unless([\\s\\S]+?)\\)",
+			"@endunless",
+			"@for([\\s\\S]+?)\\)",
+			"@endfor",
+			"@foreach([\\s\\S]+?)\\)",
+			"@endforeach",
+			"@while([\\s\\S]+?)\\)",
+			"@endwhile"
+		].join("|"), "g"),
+
+		//purify function is copied from mustache.js(c)
+		compiled_src = "var _r='',_p=function(v){var _m={'&': '&amp;','<': '&lt;','>': '&gt;','\"': '&quot;',\"\'\": '&#39;','/': '&#x2F;'};return v.replace(/[&<>\"\'\/]/g,function(s){return _m[s];});};";
+
+		var
 		validateTemplate = function (features) {
 			//invalid template:
 
 			if ( features['extends'] && features['extends'].length > 1 ) {
 				//err: more than one extends
-				return new ExceptionHandler(new Error("Template Error: Can't Inheritance from more that one template"));
 			}
 
 			if ( (features['extends'] && !features['extends'].length && features['section'] && features['section'].length) || ( !features['extends'] && features['section'] && features['section'].length) ) {
 				//have no extends but have section
-				return new ExceptionHandler(new Error("Template Logical Error: No need to use section when don't use inheritance.\n*Notice* Maybe you forgot to use `@extends`"));	
+				return new BEH(new Error("Template Logical Error: No need to use section when don't use inheritance.\n*Notice* Maybe you forgot to use `@extends`"));	
 			}
 
 			if ( features["yield"] && features["yield"].length ) {
@@ -174,7 +264,7 @@
 						}
 
 						if ( first_instance_name === second_instance_name) {
-							return new ExceptionHandler(new Error("Template Logical Error: More than one `@yield` with the same id.\n*Notice* id shall be unique."));	
+							return new BEH(new Error("Template Logical Error: More than one `@yield` with the same id.\n*Notice* id shall be unique."));	
 						}
 					}
 
@@ -190,7 +280,7 @@
 						section_features = section_syntax.exec(inheritance_features['section'][se_cnt_ri].match);
 
 					if ( !section_features ) {
-						return new ExceptionHandler(new Error("Template Syntax Error: section syntax violation.\nUsage: @section([secton_name]) [section_contents] @stop."))
+						return new BEH(new Error("Template Syntax Error: section syntax violation.\nUsage: @section([secton_name]) [section_contents] @stop."))
 					}
 
 					var first_instance_name = section_features[1].replace(/\s+/g, '');
@@ -206,7 +296,7 @@
 							section_features = section_syntax.exec(inheritance_features['section'][se_cnt_ri].match);
 
 						if ( !section_features ) {
-							return new ExceptionHandler(new Error("Syntax Error: section syntax violation.\n Usage: @section([secton_name]) [section_contents] @stop."))
+							return new BEH(new Error("Syntax Error: section syntax violation.\n Usage: @section([secton_name]) [section_contents] @stop."))
 						}
 
 						var second_instance_name = section_features[1].replace(/\s+/g, '');
@@ -216,7 +306,7 @@
 						}
 
 						if ( first_instance_name === second_instance_name) {
-							return new ExceptionHandler(new Error("Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique."));	
+							return new BEH(new Error("Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique."));	
 						}
 					}
 
@@ -227,103 +317,49 @@
 
 		},
 
-		resolveInclude = function (source, features) {
+		//	Pre-Compiler Function
+		//		PreCompiler is used to resolve inheritance related regulations like `extends` and `include`. However
+		//		`include` is not quite related to other inheritance-based terms. 
+		//
+		preCompiler = function (source) {
 
-			var modified_src = source;
+			var
+			vocabulary = new RegExp([
+				"@extends\\(([\\s\\S]+?)\\)",
+				"@section([\\s\\S]+?)@stop",
+				"@yield\\(([\\s\\S]+?)\\)",
+				"@include\\(([\\s\\S]+?)\\)"
+			].join("|"), "g"),
 
-			for (var in_cnt_rin=0; in_cnt_rin<features['include'].length; in_cnt_rin=in_cnt_rin+1) {
+			extend = function (source) {
 
-				var included_template_name = features["include"][in_cnt_rin].placement.replace(/\s+/g, '');
+				//[issue]: is it 
+				if ( source.match(/@extends\(([\s\S]+?)\)/g) > 1 ) {
+					return new BEH(new Error("Template Error: Can't Inheritance from more that one template"), "BTC.precompiler.extend");
+				}
+			},		
 
-				if (included_template_name[0] === "'" || included_template_name[0] === '"') {
-					included_template_name = included_template_name.substr(1, included_template_name.length-2);
+			include = function (source) {
+
+				var modified_src = source;
+
+				modified_src = modified_src.replace(/@include\(([\s\S]+?)\)/g, function (match, template_name, offset, string) {
+
+					var included_template_src = __FM.readTemplate(template_name);
+
+					if ( included_template_src instanceof BEH ) {
+						included_template_src.trace("BTC.precompiler.include");
+						return included_template_src;
+					}
+
+					var resolved_included_template_src = precompiler(included_template_src);
+
+					return resolved_included_template_src;
+				
 				}
 
-				var included_template_src = loadTemplate(__ROOT, included_template_name);
-
-				if ( included_template_src instanceof ExceptionHandler ) {
-					return included_template_src;
-				}
-
-				var included_inheritance_features = extractFeatures(inheritance_syntax, ["extends", "section", "include", "yield"], included_template_src),
-
-					resolved_included_template_src = resolveInheritances(included_template_src, included_inheritance_features);
-
-				modified_src = modified_src.slice(0, inheritance_features["include"][in_cnt_rin].offset) + resolved_included_template_src + modified_src.slice(inheritance_features["include"][in_cnt_rin].offset + inheritance_features["include"][in_cnt_rin].match.length, modified_src.length);
-			
-			}
-
-			return modified_src;
-		},
-
-
-		/*	this function is used to resolve the in inheritance in template
-		**	the problem caused by nested inheritance where template1 inhertance from base and template 2 inheritance from template 1
-		**	[param]: 	source				when there is no inheritance it just return the raw_template 
-		**										[caution]: the compile function will remove all the inheritance terms from template
-		**										after returning from this function
-		**				features 				childs inheritance features, used to extract the base name and then to resolve
-		**										the sections
-		**
-		**	[return]: 	ExceptionHandler		if there were any errors or so
-		**				resoleved_template		template file that all the inheritance terms are resolved
-		**										[caution]: it may still have some un resolved inheritance terms but they will be removed afterward
-		**
-		**	[example]: 	template2:
-		**					@extends(template1)
-		**					@section(contents)
-		**						this is template2!
-		**						@yield(header)
-		**					@stop
-		**				
-		**				template1:
-		**					@extends(base)
-		**					@section(body)
-		**						this is template1!
-		**						@yield(contents)
-		**						@yield(footer)
-		**					@stop
-		**				
-		**				base:
-		**					<html>
-		**					<body>
-		**						@yield(body)
-		**					</body>
-		**					</html>
-		**
-		**				resolveing ...
-		**					->template2 features: @extends(template1) => resolve template1
-		**					->template1 features: @extends(base) => resolve base
-		**					->base features: no extends and no inclued => validate base_src, return base_src
-		**					->map template1 sections and base yields => section[body] <-> yield[body]
-		**					->replace matches:
-		**						<html>
-		**						<body>
-		**							this is template1!
-		**							@yield(contents)
-		**							@yield(footer)
-		**						</body>
-		**						</html>
-		**					->validate modified_src
-		**					->return the modified_src
-		**					->map template2 sections and template2 yields => section[contents] <-> yield[contents]
-		**					->replace matches:
-		**						<html>
-		**						<body>
-		**							this is template1!
-		**							this is template2!
-		**							@yield(header)
-		**							@yield(footer)
-		**						</body>
-		**						</html>
-		**					->validate modified_src
-		**					->return the modified_src
-		**					->delete all the remaining yeilds after this function is over
-		**
-		**	[issue]: Laravel 4 templating changed a little bit, it provided the ability to map section to section
-		**			 but i don't think it's a logical way to do this
-		*/
-		resolveInheritances = function (source, features) {
+				return modified_src;
+			},
 
 			//	we consider the incoming template is valid
 			if ( features["extends"].length ) {
@@ -342,18 +378,18 @@
 
 				var base_template_src = loadTemplate(__ROOT, base_template_name);
 
-				if ( base_template_src instanceof ExceptionHandler ) {
+				if ( base_template_src instanceof BEH ) {
 					return base_template_src;
 				}
 
-				//what if some dufess extracts a `template` in `template` it self?
+				//what if some noob extracts a `template` in `template` it self?
 				if ( base_template_src === source ) {
-					return new ExceptionHandler(new Error("Inheritance Logic Error: Can't extend a template inside itself!"/*you noob!*/));
+					return new BEH(new Error("Inheritance Logic Error: Can't extend a template inside itself!"/*you noob!*/));
 				}
 
 				var base_template_validation = validateTemplate(base_template_src);
 
-				if ( validation instanceof ExceptionHandler ) {
+				if ( validation instanceof BEH ) {
 					return base_template_src;
 				}
 
@@ -362,12 +398,12 @@
 
 					resolved_base_template_src = resolveInheritances(base_template_src, base_inheritance_features, inheritance_syntax);
 
-				if ( resolved_base_template_src instanceof ExceptionHandler ) {
+				if ( resolved_base_template_src instanceof BEH ) {
 					return resolved_base_template_src;
 				}
 
-				// now we have to map the `sections` in child to `yeilds` in parents
-				// if a `section` or `yeild` in parent don't have a match in child we preserve it
+				// now we have to map the `sections` in child to `yields` in parents
+				// if a `section` or `yield` in parent don't have a match in child we preserve it
 				//[issue]: what if some parts of child are not under the `section`s should we not consider this parts of put theme at the end of template?
 
 				for (var se_cnt_ri=0; se_cnt_ri<features['section'].length; se_cnt_ri=se_cnt_ri+1) {
@@ -377,7 +413,7 @@
 						section_features = section_syntax.exec(features['section'][se_cnt_ri].match);
 
 					if ( !section_features ) {
-						return new ExceptionHandler(new Error("Syntax Error: section syntax violation.\n Usage: @section([secton_name]) [section_contents] @stop."))
+						return new BEH(new Error("Syntax Error: section syntax violation.\n Usage: @section([secton_name]) [section_contents] @stop."))
 					}
 
 					var section_name = section_features[1].replace(/\s+/g, '');
@@ -400,7 +436,7 @@
 						}
 						else if ( ye_cnt_ri === base_inheritance_features["yield"].length - 1 ){
 							//which means there is not a yield for a section
-							return new ExceptionHandler(new Error("Template Logic Error: Section `"+section_name+"` have no matching `@yeild`."));
+							return new BEH(new Error("Template Logic Error: Section `"+section_name+"` have no matching `@yeild`."));
 						}
 
 					}
@@ -413,7 +449,7 @@
 
 					validation = validateTemplate(modified_src_features);
 
-				if ( validation instanceof ExceptionHandler ) {
+				if ( validation instanceof BEH ) {
 					return base_template_src;
 				}
 
@@ -425,7 +461,7 @@
 				// yet we have to still consider include
 				// we have to first load the include then resolve it and put in our src
 				// what if we have more than one file included?
-				// be ready cuz we looping :D
+				// be ready because we looping :D
 				
 				var modified_src = resolveInclude(source, features),
 
@@ -433,55 +469,23 @@
 
 					validation = validateTemplate(modified_src_features);
 
-				if ( validation instanceof ExceptionHandler ) {
+				if ( validation instanceof BEH ) {
 					return base_template_src;
 				}
 
 				return modified_src;
 			}
 
-		},
+		};
 
-		compileTemplate = function (raw_template) {
-			//purify function is copied from mustache.js(c)
-			var compiled_src = "var _r='',_p=function(v){var _m={'&': '&amp;','<': '&lt;','>': '&gt;','\"': '&quot;',\"\'\": '&#39;','/': '&#x2F;'};return v.replace(/[&<>\"\'\/]/g,function(s){return _m[s];});};";
-
-			//fristly we have to consider the inheritance
-			//if the inheritance is used we have :
-			// 1. load the base template
-			// 2. extract the inheritance_syntax of the base template
-			// 3. replace the base template sections using section and yield
-			// 4. load and replace include templates
-			// 5. replace the raw_template with new template
-			// what if we have a nested inheritance?
-			// i think the best way is to get along with it
-			// how?
-			// recersiveness
-
-			//OK done :D
-			var	conditional_syntax = new RegExp([
-					"@if([\\s\\S]+?)\\)",
-					"@else",
-					"@elseif([\\s\\S]+?)\\)",
-					"@endif",
-					"@unless([\\s\\S]+?)\\)",
-					"@endunless",
-					"@for([\\s\\S]+?)\\)",
-					"@endfor",
-					"@foreach([\\s\\S]+?)\\)",
-					"@endforeach",
-					"@while([\\s\\S]+?)\\)",
-					"@endwhile"
-				].join("|"), "g");
-
-			var inheritance_features = extractFeatures(inheritance_syntax, ["extends", "section", "include", "yield"], raw_template),
+		var inheritance_features = extractFeatures(inheritance_syntax, ["extends", "section", "include", "yield"], raw_template),
 
 				pre_compiled_src = resolveInheritances(raw_template, inheritance_features);
 
 			pre_compiled_src = pre_compiled_src.replace(/'/g, "\\'");
 
 			//so first we need to make sure that raw_text won't be affected at any way
-			//what we want to do is to produce a very random number to palce for each raw_text instance and then after proccesing end return them
+			//what we want to do is to produce a very random number to place for each raw_text instance and then after processing end return them
 			var raw_text_map = {};
 			pre_compiled_src = pre_compiled_src.replace(/@{{([\s\S]+?)}}/g, function(match, raw_text, offset, string) {
 				var sign = Math.round(Math.random() * 10000000000000000);
@@ -550,12 +554,12 @@
 			compiled_src = compiled_src + "return _r;"
 
 			//OK the easiest is here :D
-			//to make our job easier we are gonna turn this template to a function like all other templating engines do
+			//to make our job easier we are gonna turn this template to a function like all other template engines do
 			//then return this function so who ever calls this function with the vars provided is gonna have the answer
 
 			//secondly we have to consider the conditional syntax but its the second hardest so let us go the easiest for now
 			//ok now we have to get to this
-			//actualy this not so hard (phew!)
+			//actually this not so hard (phew!)
 			//we compile the damn thing to a function that will return the compiled template
 			
 
@@ -563,76 +567,140 @@
 			//so we remove all the return chars that we collected from raw_template
 			compiled_src = compiled_src.replace(/\r+/g, "\\r");
 
-			//[issue]: the sturcture is not 100% preserved
+			//[issue]: the structure is not 100% preserved
 			//then we make sure the new line chars will stay with template to reserve template structure
 			compiled_src = compiled_src.replace(/\n+/g, "\\n");
 			
-			return compiled_src;
+			return compiled_src;		
+
+	}
+
+	//	for easing job a little i categorized the syntax to 3 major type:
+	//	inheritance_syntax: the most hard one
+	//	substitutional_syntax: easiest just a substitution
+	//	conditional_syntax: second hard
+	
+
+
+	//this function shall load the requested template and return the raw text
+	//we load templates from file in node __ENVironment and [todo]: from script tags in browsers
+	//[todo]: ajax loading for browsers
+	var 
+
+		
+
+		
+
+		
+
+
+		/*	this function is used to resolve the in inheritance in template
+		**	the problem caused by nested inheritance where template1 inheritance from base and template 2 inheritance from template 1
+		**	[param]: 	source				when there is no inheritance it just return the raw_template 
+		**										[caution]: the compile function will remove all the inheritance terms from template
+		**										after returning from this function
+		**				features 				children inheritance features, used to extract the base name and then to resolve
+		**										the sections
+		**
+		**	[return]: 	BEH		if there were any errors or so
+		**				resoleved_template		template file that all the inheritance terms are resolved
+		**										[caution]: it may still have some unresolved inheritance terms but they will be removed afterward
+		**
+		**	[example]: 	template2:
+		**					@extends(template1)
+		**					@section(contents)
+		**						this is template2!
+		**						@yield(header)
+		**					@stop
+		**				
+		**				template1:
+		**					@extends(base)
+		**					@section(body)
+		**						this is template1!
+		**						@yield(contents)
+		**						@yield(footer)
+		**					@stop
+		**				
+		**				base:
+		**					<html>
+		**					<body>
+		**						@yield(body)
+		**					</body>
+		**					</html>
+		**
+		**				resolveing ...
+		**					->template2 features: @extends(template1) => resolve template1
+		**					->template1 features: @extends(base) => resolve base
+		**					->base features: no extends and no inclued => validate base_src, return base_src
+		**					->map template1 sections and base yields => section[body] <-> yield[body]
+		**					->replace matches:
+		**						<html>
+		**						<body>
+		**							this is template1!
+		**							@yield(contents)
+		**							@yield(footer)
+		**						</body>
+		**						</html>
+		**					->validate modified_src
+		**					->return the modified_src
+		**					->map template2 sections and template2 yields => section[contents] <-> yield[contents]
+		**					->replace matches:
+		**						<html>
+		**						<body>
+		**							this is template1!
+		**							this is template2!
+		**							@yield(header)
+		**							@yield(footer)
+		**						</body>
+		**						</html>
+		**					->validate modified_src
+		**					->return the modified_src
+		**					->delete all the remaining yields after this function is over
+		**
+		**	[issue]: Laravel 4 templating changed a little bit, it provided the ability to map section to section
+		**			 but i don't think it's a logical way to do this
+		*/
+		
+
+		compileTemplate = function (raw_template) {
+			
+
+			//firstly we have to consider the inheritance
+			//if the inheritance is used we have :
+			// 1. load the base template
+			// 2. extract the inheritance_syntax of the base template
+			// 3. replace the base template sections using section and yield
+			// 4. load and replace include templates
+			// 5. replace the raw_template with new template
+			// what if we have a nested inheritance?
+			// i think the best way is to get along with it
+			// how?
+			// recessiveness
+
+			//OK done :D
+
+			
 		};
 
 
 
 	//this is the main method that gets the name of a template and returns the compiled template as string
-	// param: template name [example: "admin.users.creat"]
+	// param: template name [example: "admin.users.create"]
 	// returns: String
 	blade_p.make = function (template_name, vars) {
 
-		//frist thing tha happens is that we get the raw template
+		//first thing that happens is that we get the raw template
 		var raw_template = loadTemplate(this.__ROOT, template_name);
 
-		if ( raw_template instanceof ExceptionHandler ) {
+		if ( raw_template instanceof BEH ) {
 			return raw_template.render();
 		}
 
 		var compiled_template = compileTemplate(raw_template, this);
 
-		if ( compiled_template instanceof ExceptionHandler ) {
+		if ( compiled_template instanceof BEH ) {
 			return compiled_template.render();
 		}
-		
-		//[issue][need_test]: injecting functions?
-		var template = function () {
-			this.__injected = false;
-			this.with = function (vars, values) {
-				console.log(typeof vars);
-				if ( typeof vars === "object") {
-					for(var _v in vars) {
-						if( vars[_v] instanceof Function) {
-							this.src = "var "+_v+"="+vars[_v].toString()+";" + this.src;
-						}
-						else {
-							this.src = "var "+_v+"="+JSON.stringify(vars[_v])+";" + this.src;
-						}
-					}
-				}
-				else if (typeof vars === "string") {
-					if( values instanceof Function) {
-							this.src = "var "+vars+"="+values.toString()+";" + this.src;
-					}
-					else {
-						this.src = "var "+vars+"="+JSON.stringify(values)+";" + this.src;							
-					}
-				}
-				else {
-					return new ExceptionHandler(new Error("Template Error: Invalid argument passed: `"+JSON.stringify(vars)+"`!"));
-				}
-
-				return this;
-			};
-			this.src = "";
-			this.render = function() {
-				try {
-					var _fn = new Function(this.src);
-				}
-				catch (e) {
-					//after test we shall now whats going wrong here and why
-					return false;
-				};
-
-				return _fn();
-			};
-			return this;
-		};
 
 		var res = new template();
 		res.src = compiled_template;

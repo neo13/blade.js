@@ -1,0 +1,13 @@
+{
+	"author": "neo13",
+	"name": "blade.js-test-suit",
+	"description": "blade.js test suit",
+	"version": "0.0.1",
+	"dependencies": {
+		"mocha": "*",
+		"chai": "*"
+	},
+	"engines": {
+		"node": "*"
+	}
+}
