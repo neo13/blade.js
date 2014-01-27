@@ -1,0 +1,1 @@
+template_dir/site/template_name.blade.js
