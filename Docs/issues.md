@@ -1,0 +1,2 @@
+[issue]: is it logical to not let extend more than one template?
+[answer]: the extend in template is diffrent from extend in class, in classes if you extend more than one base-class thier methods and data whould add to your class but in templates the child template will get parent structure and because the child can not have more than one structure so it won't work. 

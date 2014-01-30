@@ -54,7 +54,12 @@
 		__ENV = "browser";
 	}
 
-	var blade_p = blade.prototype;
+	var 
+	blade_p = blade.prototype,
+	impurities = /[\s\(\)\'\"]+/g,
+	UID = function () { return Math.round(Math.random() * 10000000000000000) };
+
+	String.prototype.clean = String.prototype.replace,
 
 	blade_p.__VERSION = "under construction";
 	blade_p.__ENV = __ENV;
@@ -139,7 +144,7 @@
 	function BTFM (document_root, storage_type) {
 
 		this.refineTemplateName = function (template_name) {
-			return template_name.replace(/[\s\(\)\'\"]+/g, '');
+			return template_name.clean(impurities, '');
 		};
 
 		this.resolveTemplateFileName = function (template_name) {
@@ -233,16 +238,16 @@
 
 		this.readTemplate = function (template_name) {
 
-			template_name = refineTemplateName(template_name);
+			template_name = this.refineTemplateName(template_name);
 
 			if ( this.__STORAGE === "FileSystem" ) {
-				return loadTemplateFile(resolveTemplateFileName(template_name));
+				return this.loadTemplateFile(this.resolveTemplateFileName(template_name));
 			}
 			else if ( this.__STORAGE === "DOM") {
-				return loadTemplateTag(resolveTemplateTagName(template_name));
+				return this.loadTemplateTag(this.resolveTemplateTagName(template_name));
 			}
 			else {
-				return getTemplate(resolveTemplateURL(template_name));
+				return this.getTemplate(this.resolveTemplateURL(template_name));
 			}
 
 		}
@@ -259,7 +264,7 @@
 	//		the core of Blade.js library and its performance is vital for the library.
 	//		[todo]: needs reviews and speed up  
 	//
-	function BTC (template_name, file_manager) {
+	function BTC (source, file_manager) {
 
 		var 
 		__FM = file_manager,
@@ -280,90 +285,7 @@
 		].join("|"), "g"),
 
 		//purify function is copied from mustache.js(c)
-		compiled_src = "var _r='',_p=function(v){var _m={'&': '&amp;','<': '&lt;','>': '&gt;','\"': '&quot;',\"\'\": '&#39;','/': '&#x2F;'};return v.replace(/[&<>\"\'\/]/g,function(s){return _m[s];});};";
-
-		var
-		validateTemplate = function (features) {
-			//invalid template:
-
-			if ( features['extends'] && features['extends'].length > 1 ) {
-				//err: more than one extends
-			}
-
-			if ( (features['extends'] && !features['extends'].length && features['section'] && features['section'].length) || ( !features['extends'] && features['section'] && features['section'].length) ) {
-				//have no extends but have section
-				return new BEH(new Error("Template Logical Error: No need to use section when don't use inheritance.\n*Notice* Maybe you forgot to use `@extends`"));	
-			}
-
-			if ( features["yield"] && features["yield"].length ) {
-				//	more than one yield with the same name
-				for (var ye_cnt_vt=0; ye_cnt_vt<features["yield"].length ; ye_cnt_vt=ye_cnt_vt+1) {
-					var first_instance_name = features["yield"][ye_cnt_vt].placement.replace(/\s+/g, '');
-
-					if (first_instance_name[0] === "'" || first_instance_name[0] === '"') {
-						first_instance_name = first_instance_name.substr(1, first_instance_name.length-2);
-					}
-
-					for(var ye_cnt2_vt=ye_cnt_vt+1; ye_cnt2_vt<features["yield"].length; ye_cnt2_vt=ye_cnt2_vt+1) {
-						var second_instance_name = features["yield"][ye_cnt2_vt].placement.replace(/\s+/g, '');
-
-						if (second_instance_name[0] === "'" || second_instance_name[0] === '"') {
-							second_instance_name = second_instance_name.substr(1, second_instance_name.length-2);
-						}
-
-						if ( first_instance_name === second_instance_name) {
-							return new BEH(new Error("Template Logical Error: More than one `@yield` with the same id.\n*Notice* id shall be unique."));	
-						}
-					}
-
-				}
-			}
-
-			if ( features["section"] && features["section"].length ) {
-				//	more than one section with the same name
-				for (var se_cnt_vt=0; se_cnt_vt<features["section"].length ; se_cnt_vt=se_cnt_vt+1) {
-					
-					var section_syntax = new RegExp("@section\\(([\\s\\S]+?)\\)([\\s\\S]+?)@stop", "g"),
-
-						section_features = section_syntax.exec(inheritance_features['section'][se_cnt_ri].match);
-
-					if ( !section_features ) {
-						return new BEH(new Error("Template Syntax Error: section syntax violation.\nUsage: @section([secton_name]) [section_contents] @stop."))
-					}
-
-					var first_instance_name = section_features[1].replace(/\s+/g, '');
-
-					if (first_instance_name[0] === "'" || first_instance_name[0] === '"') {
-						first_instance_name = first_instance_name.substr(1, first_instance_name.length-2);
-					}
-
-					for(var se_cnt2_vt=se_cnt_vt+1; se_cnt2_vt<features["section"].length; se_cnt2_vt=se_cnt2_vt+1) {
-
-						var section_syntax = new RegExp("@section\\(([\\s\\S]+?)\\)([\\s\\S]+?)@stop", "g"),
-
-							section_features = section_syntax.exec(inheritance_features['section'][se_cnt_ri].match);
-
-						if ( !section_features ) {
-							return new BEH(new Error("Syntax Error: section syntax violation.\n Usage: @section([secton_name]) [section_contents] @stop."))
-						}
-
-						var second_instance_name = section_features[1].replace(/\s+/g, '');
-
-						if (second_instance_name[0] === "'" || second_instance_name[0] === '"') {
-							second_instance_name = second_instance_name.substr(1, second_instance_name.length-2);
-						}
-
-						if ( first_instance_name === second_instance_name) {
-							return new BEH(new Error("Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique."));	
-						}
-					}
-
-				}
-			}
-
-			return true;
-
-		},
+		compiled_src = "var _r='',_p=function(v){var _m={'&': '&amp;','<': '&lt;','>': '&gt;','\"': '&quot;',\"\'\": '&#39;','/': '&#x2F;'};return v.replace(/[&<>\"\'\/]/g,function(s){return _m[s];});};",
 
 		//	Pre-Compiler Function
 		//		PreCompiler is used to resolve inheritance related regulations like `extends` and `include`. However
@@ -374,13 +296,12 @@
 			var
 			extend = function (source) {
 
-				//[issue]: is it logical to not let extend more than one template?
-				var extend_count = source.match(/@extends([\s\S]+?)\)/g).length;
+				var match = source.match(/@extends/g);
 
-				if ( extend_count > 1 ) {
+				if ( match && match.length > 1 ) {
 					return new BEH(new Error("Template Error: Can't Inheritance from more that one template"), "BTC.precompiler.extend");
 				}
-				else if ( extend_count === 0) {
+				else if ( !match ) {
 					return false;
 				}
 				else {
@@ -415,14 +336,14 @@
 						return included_template_src;
 					}
 
-					var precompiled_included_template_src = precompiler(included_template_src);
+					var precompiled_included_template_src = preCompiler(included_template_src);
 
 					return precompiled_included_template_src;
 				
 				});
 
 				return modified_src;
-
+				
 			};
 
 			var precompiled_base_template_src = extend(source),
@@ -433,13 +354,25 @@
 
 				var sections = {};
 
-				source.replace(/@section([\s\S]+?)\)([\s\S]+?)@stop/g, function (match, section_name, section_content, offset, string) {
-					sections[section_name.replace(/[\'\"\)\s]/g, "")] = section_content;
-					return "";
-				});
+				try {
+					source.replace(/@section([\s\S]+?)\)([\s\S]+?)@stop/g, function (match, section_name, section_content, offset, string) {
+						section_name = section_name.clean(impurities, "");
+						if( !sections[section_name] ){
+							sections[section_name] = section_content;	
+						}
+						else {
+							throw new Error("Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique.")
+						}
+						
+						return "";
+					});
+				}
+				catch (e) {
+					return new BEH(e);
+				}
 
 				precompiled_base_template_src = precompiled_base_template_src.replace(/@yield([\s\S]+?)\)/g, function (match, yield_name, offset, string) {
-					yield_name = yield_name.replace(/[\'\"\)\s]/g, "");
+					yield_name = yield_name.clean(impurities, "");
 					if ( sections[yield_name] ) {
 						return sections[yield_name];
 					}
@@ -452,34 +385,43 @@
 
 			}
 			else {
-
 				return included_template_src;
 
 			}
 
 		};
 
-		var source = __FM.readTemplate(template_name),
+		var pre_compiled_src = preCompiler(source);
 
-			pre_compiled_src = preCompiler(source);
+		pre_compiled_src = pre_compiled_src.clean(/@yield([\s\S]+?)\)/, "");
+
+		pre_compiled_src = pre_compiled_src.replace(/\'/g, "\\\'");
 
 		//so first we need to make sure that raw_text won't be affected at any way
 		//what we want to do is to produce a very random number to place for each raw_text instance and then after processing end return them
 		var raw_text_map = {};
-		pre_compiled_src = pre_compiled_src.replace(/@{{([\s\S]+?)}}/g, function(match, raw_text, offset, string) {
-			var sign = Math.round(Math.random() * 10000000000000000);
-			raw_text_map[sign] = raw_text;
-			return "${${"+sign+"}$}$";
+
+		var raw_text = /@{{([\s\S]+?)}}/g;
+
+		pre_compiled_src = pre_compiled_src.replace(raw_text, function(match, raw_text, offset, string) {
+
+			var text_id = UID();
+
+			raw_text_map[text_id] = raw_text;
+
+			return "${${"+text_id+"}$}$";
+
 		});
 
+
 		//then we need to strip off the comments
-		pre_compiled_src = pre_compiled_src.replace(/{{--([\s\S]+?)--}}/g, "");
+		var comments = /{{--([\s\S]+?)--}}/g;
+		pre_compiled_src = pre_compiled_src.clean(comments, "");
 
 		//after that we will consider conditional_syntax
 		pre_compiled_src = pre_compiled_src.replace(conditional_syntax, function (match, _if, _elseif, _unless, _for, _foreach, _while, offset, string) {
 
 			if (match === "@else") {
-				console.log('test');
 				return "';}else{_r=_r+'";
 			}
 			else if (match === "@endif" || match === "@endunless" || match === "@endfor" || match === "@endforeach" || match === "@endwhile") {
@@ -523,7 +465,7 @@
 			return "";
 		});
 
-		compiled_src = compiled_src + "_r=_r+'" + pre_compiled_src.slice(ptr,compiled_src.length) + "';";
+		compiled_src = compiled_src + "_r=_r+'" + pre_compiled_src.slice(ptr,pre_compiled_src.length) + "';";
 
 		//now that we have compiled the source we have to map the raw_texts
 		for (var raw_text in raw_text_map) {
