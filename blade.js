@@ -143,15 +143,21 @@
 	//
 	function BTFM (document_root, storage_type) {
 
-		this.refineTemplateName = function (template_name) {
+		var
+		__ROOT = this.__ROOT = document_root || "./templates",
+
+		//	[todo]: Other type of storages 
+		__STORAGE = this.__STORAGE = "FileSystem",
+
+		refineTemplateName = function (template_name) {
 			return template_name.clean(impurities, '');
-		};
+		},
 
-		this.resolveTemplateFileName = function (template_name) {
-			return this.__ROOT + '/' + template_name.split('.').join("/") + '.blade.js';
-		};
+		resolveTemplateFileName = function (template_name) {
+			return __ROOT + '/' + template_name.split('.').join("/") + '.blade.js';
+		},
 
-		this.resolveTemplateTagName = function (template_name) {
+		resolveTemplateTagName = function (template_name) {
 			//	the way this works is to let users create meaningfull nested templates using in thier html files
 			//	users shall use `<div id="[document_root]"></div>` tag name to specify the root of templates
 			//	for nested templates just a div#template_directory
@@ -159,21 +165,21 @@
 			//	[todo]: custom tag names
 			template_name = template_name.split('.');
 			if (template_name.length > 1) {
-				return "div#" + this.__ROOT + " > div#" + template_name.slice(0,template_name.length-1).join(" > div#") + " > div." + template_name[template_name.length-1];
+				return "div#" + __ROOT + " > div#" + template_name.slice(0,template_name.length-1).join(" > div#") + " > div." + template_name[template_name.length-1];
 			}
 			else {
-			return "div#" + this.__ROOT + " > div." + template_name[template_name.length-1];	
+			return "div#" + __ROOT + " > div." + template_name[template_name.length-1];	
 			}
-		};
+		},
 
-		this.resolveTemplateURL = function (template_name) {
+		resolveTemplateURL = function (template_name) {
 			//	this is used for when a template is supposed load from a url
 			//	[todo]: http/https
-			return encodeURIComponent(this.__ROOT + '/' + template_name.split('.').join("/"));
+			return encodeURIComponent(__ROOT + '/' + template_name.split('.').join("/"));
 			
-		};
+		},
 
-		this.loadTemplateFile = function (file_name) {
+		loadTemplateFile = function (file_name) {
 			//	[todo]: browser based load and catch template file
 			//	[todo]: phone gap based
 			var fs = require('fs');
@@ -186,24 +192,24 @@
 						return result;
 					}
 					else {
-						return new BEH(new Error("Empty Template: " + file_name));
+						throw new Error("Empty Template: " + file_name);
 					}
 				}
 				catch (e) {
-					return new BEH(e);
+					throw new BEH(e);
 				}
 			}
 			else {
-				return new BEH(new Error("Template does not existes: " + file_name));
+				throw new BEH(new Error("Template does not exist: " + file_name));
 			}
 
-		};
+		},
 
-		this.loadTemplateTag = function (tag_name) {
+		loadTemplateTag = function (tag_name) {
 			return document.querySelector(tag_name).innerHtml;
 		},
 
-		this.getTemplate = function (template_url) {
+		getTemplate = function (template_url) {
 
 			if( XMLHttpRequest ){
 				var xhr = new XMLHttpRequest();
@@ -228,7 +234,7 @@
 				xhr.send(null);
 			}
 			catch (e) {
-				return new BEH(e);
+				throw new BEH(e);
 			}
 
 			if( xhr.readyState === 4) {
@@ -238,23 +244,26 @@
 
 		this.readTemplate = function (template_name) {
 
-			template_name = this.refineTemplateName(template_name);
+			template_name = refineTemplateName(template_name);
 
 			if ( this.__STORAGE === "FileSystem" ) {
-				return this.loadTemplateFile(this.resolveTemplateFileName(template_name));
+				return loadTemplateFile(resolveTemplateFileName(template_name));
 			}
 			else if ( this.__STORAGE === "DOM") {
-				return this.loadTemplateTag(this.resolveTemplateTagName(template_name));
+				return loadTemplateTag(resolveTemplateTagName(template_name));
 			}
 			else {
-				return this.getTemplate(this.resolveTemplateURL(template_name));
+				return getTemplate(resolveTemplateURL(template_name));
 			}
-
 		}
 
-		this.__ROOT = document_root || "./templates";
-		//	[todo]: Other type of storages 
-		this.__STORAGE = "FileSystem";
+	}
+
+
+	//
+	//	Template Catch System
+	//
+	function TC () {
 
 	}
 
@@ -269,20 +278,7 @@
 		var 
 		__FM = file_manager,
 
-		conditional_syntax = new RegExp([
-			"@if([\\s\\S]+?)\\)",
-			"@else",
-			"@elseif([\\s\\S]+?)\\)",
-			"@endif",
-			"@unless([\\s\\S]+?)\\)",
-			"@endunless",
-			"@for([\\s\\S]+?)\\)",
-			"@endfor",
-			"@foreach([\\s\\S]+?)\\)",
-			"@endforeach",
-			"@while([\\s\\S]+?)\\)",
-			"@endwhile"
-		].join("|"), "g"),
+		raw_text_map,
 
 		//purify function is copied from mustache.js(c)
 		compiled_src = "var _r='',_p=function(v){var _m={'&': '&amp;','<': '&lt;','>': '&gt;','\"': '&quot;',\"\'\": '&#39;','/': '&#x2F;'};return v.replace(/[&<>\"\'\/]/g,function(s){return _m[s];});};",
@@ -294,29 +290,35 @@
 		preCompiler = function (source) {
 
 			var
+			precompiled_base_template_src,
+
+			included_template_src,
+
+			sections,
+
 			extend = function (source) {
 
-				var match = source.match(/@extends/g);
+				var match = source.match(/@extends/g),
+
+					base_template_src,
+
+					precompiled_base_template_src;
 
 				if ( match && match.length > 1 ) {
-					return new BEH(new Error("Template Error: Can't Inheritance from more that one template"), "BTC.precompiler.extend");
+					throw new BEH(new Error("Template Error: Can't Inheritance from more that one template"), "BTC.precompiler.extend");
 				}
 				else if ( !match ) {
 					return false;
 				}
 				else {
-					var base_template_src = __FM.readTemplate(/@extends([\s\S]+?)\)/g.exec(source)[1]);
+
+					base_template_src = __FM.readTemplate(/@extends([\s\S]+?)\)/g.exec(source)[1]);
 
 					if ( base_template_src === source ) {
-						return new BEH(new Error("Inheritance Logic Error: Can't extend a template inside itself!"/*you noob!*/));
+						throw new BEH(new Error("Inheritance Logic Error: Can't extend a template inside itself!"/*you noob!*/));
 					}
 
-					if ( base_template_src instanceof BEH ) {
-						base_template_src.trace("BTC.precompiler.extend");
-						return base_template_src;
-					}
-
-					var precompiled_base_template_src = precompiler(base_template_src);
+					precompiled_base_template_src = preCompiler(base_template_src);
 
 					return precompiled_base_template_src;
 				}
@@ -325,18 +327,17 @@
 
 			include = function (source) {
 
-				var modified_src = source;
+				var modified_src = source,
+
+					included_template_src,
+
+					precompiled_included_template_src;
 
 				modified_src = modified_src.replace(/@include([\s\S]+?)\)/g, function (match, template_name, offset, string) {
 
-					var included_template_src = __FM.readTemplate(template_name);
+					included_template_src = __FM.readTemplate(template_name);
 
-					if ( included_template_src instanceof BEH ) {
-						included_template_src.trace("BTC.precompiler.include");
-						return included_template_src;
-					}
-
-					var precompiled_included_template_src = preCompiler(included_template_src);
+					precompiled_included_template_src = preCompiler(included_template_src);
 
 					return precompiled_included_template_src;
 				
@@ -344,35 +345,30 @@
 
 				return modified_src;
 				
-			};
+			},
 
-			var precompiled_base_template_src = extend(source),
+			getSections = function (source) {
+				var
+				sections = {};
 
-				included_template_src = include(source);
+				source.replace(/@section([\s\S]+?)\)([\s\S]+?)@stop/g, function (match, section_name, section_content, offset, string) {
+					
+					section_name = section_name.clean(impurities, "");
 
-			if ( precompiled_base_template_src ) {
+					if( sections[section_name] ){
+						throw new BEH(new Error("Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique."));
+					}
+					
+					sections[section_name] = section_content;
 
-				var sections = {};
+				});
+				return sections;
+			},
 
-				try {
-					source.replace(/@section([\s\S]+?)\)([\s\S]+?)@stop/g, function (match, section_name, section_content, offset, string) {
-						section_name = section_name.clean(impurities, "");
-						if( !sections[section_name] ){
-							sections[section_name] = section_content;	
-						}
-						else {
-							throw new Error("Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique.")
-						}
-						
-						return "";
-					});
-				}
-				catch (e) {
-					return new BEH(e);
-				}
-
-				precompiled_base_template_src = precompiled_base_template_src.replace(/@yield([\s\S]+?)\)/g, function (match, yield_name, offset, string) {
+			replaceYields = function (source, sections) {
+				source = source.replace(/@yield([\s\S]+?)\)/g, function (match, yield_name, offset, string) {
 					yield_name = yield_name.clean(impurities, "");
+
 					if ( sections[yield_name] ) {
 						return sections[yield_name];
 					}
@@ -381,118 +377,181 @@
 					}
 				});
 
-				return precompiled_base_template_src;
+				return source;
 
-			}
-			else {
-				return included_template_src;
+			};
 
+			return (function (source) {
+
+				precompiled_base_template_src = extend(source);
+
+				included_template_src = include(source);
+
+				if ( precompiled_base_template_src ) {
+
+					sections = getSections(source);
+
+					return replaceYields(precompiled_base_template_src, sections);
+
+				}
+				else {
+					return included_template_src;
+				}
+
+			})(source);
+
+		},
+
+		mapper = function (source) {
+
+			var
+			preMapper = function (source) {
+				var
+				form_builder = function () {
+
+				},
+
+				asset_manager = function () {
+
+				};
+				//...
+
+				return (function (source) {
+					//map the functionality here
+					return source;
+				})(source);
+				
+			},
+
+			
+
+			mapConditions = function (source) {
+				var
+				conditions = new RegExp([
+							"@if([\\s\\S]+?)\\)",
+							"@else(?!if)",
+							"@elseif([\\s\\S]+?)\\)",
+							"@endif",
+							"@unless([\\s\\S]+?)\\)",
+							"@endunless",
+							"@for([\\s\\S]+?)\\)",
+							"@endfor",
+							"@foreach([\\s\\S]+?)\\)",
+							"@endforeach",
+							"@while([\\s\\S]+?)\\)",
+							"@endwhile"
+				].join("|"), "g");
+
+				source = source.replace(conditions, function (match, _if, _elseif, _unless, _for, _foreach, _while, offset, string) {
+
+					if (match === "@else") {
+						return "';}else{_r=_r+'";
+					}
+					else if (match === "@endif" || match === "@endunless" || match === "@endfor" || match === "@endforeach" || match === "@endwhile") {
+						return "';}_r=_r+'";
+					}
+					else if ( _elseif ){
+						return "';}else if("+_elseif.clean(/\(/, "")+"){_r=_r+'";	
+					}
+					else if ( _if || _for || _while) {
+						return "';"+match.slice(1,match.length)+"{_r=_r+'";
+					}
+					else if ( _unless ) {
+						return "';if("+_unless.clean(/\(/, "")+"){_r=_r+'";
+					}
+					else{
+						var condition = _foreach.replace(/\(/, ""),
+							object = condition.split(" as ")[0].replace(/\s+/g, ""),
+							variable = condition.split(" as ")[1].replace(/\s+/g, ""),
+							loop_variable_name = "v"+ Math.round(Math.random() * 100000);
+
+						//[issue]: its been said that for in loop is not good for Array
+						return "';for(var "+loop_variable_name+" in "+ object + "){var "+ variable + "="+ object + "[" + loop_variable_name + "];_r=_r+'";
+					}
+
+				});
+				return source;
+			};
+
+			return (function (source) {
+				source = source.clean(/@yield([\s\S]+?)\)/, "");
+				source = source.replace(/\'/g, "\\\'");
+				source = preMapper(source);				
+				source = mapConditions(source);
+				return source;
+			})(source);
+
+		},
+
+		extractRawText = function (source, map) {
+			
+			var
+			text_id;
+
+			source = source.replace(/@{{([\s\S]+?)}}/g, function(match, raw_text, offset, string) {
+
+				text_id = UID();
+
+				raw_text_map[text_id] = raw_text;
+
+				return "${${"+text_id+"}$}$";
+
+			});
+
+			return source;
+
+		},
+
+
+		mapRawText = function (source, map) {
+
+			for (var raw_text in map) {
+				source = source.replace("${${"+raw_text+"}$}$", map[raw_text]);
 			}
+
+			return source;
 
 		};
 
-		var pre_compiled_src = preCompiler(source);
+		return (function (source) {
 
-		pre_compiled_src = pre_compiled_src.clean(/@yield([\s\S]+?)\)/, "");
+			source = extractRawText(source, raw_text_map);
 
-		pre_compiled_src = pre_compiled_src.replace(/\'/g, "\\\'");
+			source = source.clean(/{{--([\s\S]+?)--}}/g, "");
 
-		//so first we need to make sure that raw_text won't be affected at any way
-		//what we want to do is to produce a very random number to place for each raw_text instance and then after processing end return them
-		var raw_text_map = {};
+			source = preCompiler(source);	
 
-		var raw_text = /@{{([\s\S]+?)}}/g;
+			source = mapper(source);
+				
+			var ptr = 0;
+			source.replace(/{{{([\s\S]+?)}}}|{{([\s\S]+?)}}/g, function (match, purified, echo, offset, string) {
 
-		pre_compiled_src = pre_compiled_src.replace(raw_text, function(match, raw_text, offset, string) {
+				compiled_src = compiled_src + "_r=_r+'" + string.slice(ptr,offset) + "';";
+				ptr = offset + match.length;
 
-			var text_id = UID();
+				if ( purified ) {
+					compiled_src = compiled_src + "_r=_r+_p("+purified+");";
+				}
+				else{
+					compiled_src = compiled_src + "_r=_r+"+echo+";";
+				}
 
-			raw_text_map[text_id] = raw_text;
+				return "";
+			});
 
-			return "${${"+text_id+"}$}$";
+			compiled_src = compiled_src + "_r=_r+'" + source.slice(ptr,source.length) + "';";
 
-		});
-
-
-		//then we need to strip off the comments
-		var comments = /{{--([\s\S]+?)--}}/g;
-		pre_compiled_src = pre_compiled_src.clean(comments, "");
-
-		//after that we will consider conditional_syntax
-		pre_compiled_src = pre_compiled_src.replace(conditional_syntax, function (match, _if, _elseif, _unless, _for, _foreach, _while, offset, string) {
-
-			if (match === "@else") {
-				return "';}else{_r=_r+'";
-			}
-			else if (match === "@endif" || match === "@endunless" || match === "@endfor" || match === "@endforeach" || match === "@endwhile") {
-				return "';}_r=_r+'";
-			}
-			else if ( _elseif ){
-				return "';}"+match.slice(1,match.length)+"{_r=_r+'";	
-			}
-			else if ( _if || _for || _while) {
-				return "';"+match.slice(1,match.length)+"{_r=_r+'";
-			}
-			else if ( _unless ) {
-				return "';if("+_unless.replace(/\(/, "")+"){_r=_r+'";
-			}
-			else{
-				var condition = _foreach.replace(/\(/, ""),
-					object = condition.split(" as ")[0].replace(/\s+/g, ""),
-					variable = condition.split(" as ")[1].replace(/\s+/g, ""),
-					loop_variable_name = "v"+ Math.round(Math.random() * 100000);
-
-				//[issue]: its been said that for in loop is not good for Array
-				return "';for(var "+loop_variable_name+" in "+ object + "){var "+ variable + "="+ object + "[" + loop_variable_name + "];_r=_r+'";
-			}
-
-		});
+			compiled_src = mapRawText(compiled_src, raw_text_map);
 			
-		var ptr = 0;
-		//now it's time to do echo and purified echo and also to compile the pre_compiled source
-		pre_compiled_src.replace(/{{{([\s\S]+?)}}}|{{([\s\S]+?)}}/g, function (match, purified, echo, offset, string) {
+			compiled_src = compiled_src + "return _r;"
 
-			compiled_src = compiled_src + "_r=_r+'" + string.slice(ptr,offset) + "';";
-			ptr = offset + match.length;
+			compiled_src = compiled_src.replace(/\r+/g, "\\r");
 
-			if ( purified ) {
-				compiled_src = compiled_src + "_r=_r+_p("+purified+");";
-			}
-			else{
-				compiled_src = compiled_src + "_r=_r+"+echo+";";
-			}
+			compiled_src = compiled_src.replace(/\n+/g, "\\n");
+			
+			return compiled_src;
 
-			return "";
-		});
-
-		compiled_src = compiled_src + "_r=_r+'" + pre_compiled_src.slice(ptr,pre_compiled_src.length) + "';";
-
-		//now that we have compiled the source we have to map the raw_texts
-		for (var raw_text in raw_text_map) {
-			compiled_src = compiled_src.replace("${${"+raw_text+"}$}$", raw_text_map[raw_text]);
-		}
-
-		compiled_src = compiled_src + "return _r;"
-
-		//OK the easiest is here :D
-		//to make our job easier we are gonna turn this template to a function like all other template engines do
-		//then return this function so who ever calls this function with the vars provided is gonna have the answer
-
-		//secondly we have to consider the conditional syntax but its the second hardest so let us go the easiest for now
-		//ok now we have to get to this
-		//actually this not so hard (phew!)
-		//we compile the damn thing to a function that will return the compiled template
-		
-
-		//last thing that we have to do is to make our strings valid
-		//so we remove all the return chars that we collected from raw_template
-		compiled_src = compiled_src.replace(/\r+/g, "\\r");
-
-		//[issue]: the structure is not 100% preserved
-		//then we make sure the new line chars will stay with template to reserve template structure
-		compiled_src = compiled_src.replace(/\n+/g, "\\n");
-		
-		return compiled_src;		
+		})(source);
 
 	};
 
