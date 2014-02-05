@@ -159,19 +159,100 @@ dsc("Blade.js Template Compiler", function () {
 			  .and.to.have.deep.property('err.message', "Template Logical Error: More than one `@section` with the same id.\n*Notice* id shall be unique.");
 	});
 
-	it("should compile `if` statement", function () {
-		var src = "@if(c) IF OK @elseif(d) ElseIf OK @else Else OK @endif",
-			cmp = btc(src, btfm),
-			injection = "var c=true, d=false;",
-			fn = new Function(injection+cmp);
-		expect(fn()).to.be.equal(' IF OK ');
-		injection = "var c=false, d=true;",
-		fn = new Function(injection+cmp);
-		expect(fn()).to.be.equal(' ElseIf OK ');
-		injection = "var c=false, d=false;",
-		fn = new Function(injection+cmp);
-		expect(fn()).to.be.equal(' Else OK ');
+	dsc("`if` statement", function () {
+		it("should work if the `if` condition is true", function () {
+			var src = "@if(c) IF OK @elseif(d) ElseIf OK @else Else OK @endif",
+				cmp = btc(src, btfm),
+				injection = [
+					"var c=true, d=false;",
+					"var c=true, d=true;",
+				];				
+			for (i in injection) {
+				fn = new Function(injection[i]+cmp);
+				expect(fn()).to.be.equal(' IF OK ');
+			}
+		});
+
+		it('should work if `if` condition is not true but the `elseif` condition is true', function () {
+			var src = "@if(c) IF OK @elseif(d) ElseIf OK @else Else OK @endif",
+				cmp = btc(src, btfm),
+				injection = "var c=false, d=true;",
+				fn = new Function(injection+cmp);
+			expect(fn()).to.be.equal(' ElseIf OK ');
+		});
+		
+		it('should work if `if` condition is not true and the `elseif` condition is not true either', function () {
+			var src = "@if(c) IF OK @elseif(d) ElseIf OK @else Else OK @endif",
+				cmp = btc(src, btfm),
+				injection = "var c=false, d=false;",
+				fn = new Function(injection+cmp);
+			expect(fn()).to.be.equal(' Else OK ');
+		});
 	});
 
-	
+	dsc("`unless` statement", function () {
+		it("should replace `unless` containments if the condition have been meet", function () {
+			var src = "@unless(c) Unless OK @endunless",
+				cmp = btc(src, btfm),
+				injection = "var c=true;";
+				fn = new Function(injection+cmp);
+			expect(fn()).to.be.equal(' Unless OK ');
+		});
+
+		it("should not replace `unless` containments if the condition is not true", function () {
+			var src = "@unless(c) Unless OK @endunless",
+				cmp = btc(src, btfm),
+				injection = "var c=false;",
+				fn = new Function(injection+cmp);
+			expect(fn()).to.be.equal('');
+		});
+	});
+
+	it("should compile `for` statement clearly", function () {
+		var src = "@for(i=0; i<5; i=i+1) For OK @endfor",
+			cmp = btc(src, btfm),
+			fn = new Function(cmp);
+		expect(fn()).to.be.equal(' For OK  For OK  For OK  For OK  For OK ');
+	});
+
+	dsc("`foreach` statement", function () {
+		it("should compile when using Lists", function () {
+			var src = "@foreach( users as user )	@if(user.status === 'admin')		welcome admin, {{ user.name }}	@elseif (user.status === 'reseller' )		welcome reseller, {{user.name}}	@else		welcome user, {{user.name }}@endif @endforeach",
+				cmp = btc(src, btfm),
+				injection = "var users = [ { 'name': 'ali' }, { 'name': 'hasan' }, { 'name': 'taghi' }];";
+				fn = new Function(injection+cmp);
+			expect(fn()).to.be.equal('\t\t\twelcome user, ali \t\t\twelcome user, hasan \t\t\twelcome user, taghi ');
+		});
+		
+		it("should compile when using Objects", function () {
+			var src = "@foreach( users as user )	@if(user.status === 'admin')		welcome admin, {{ user.name }}	@elseif (user.status === 'reseller' )		welcome reseller, {{user.name}}	@else		welcome user, {{user.name }}@endif @endforeach",
+				cmp = btc(src, btfm),
+				injection = "var users = { 'ali':{ 'name': 'ali' }, 'hasan':{ 'name': 'hasan' }, 'taghi':{ 'name': 'taghi' }};";
+				fn = new Function(injection+cmp);
+			expect(fn()).to.be.equal('\t\t\twelcome user, ali \t\t\twelcome user, hasan \t\t\twelcome user, taghi ');
+		});
+	});
+
+	it("should compile `while` statement clearly", function () {
+		var src = "@while(c) @{{c-=1;}}While OK @endfor",
+			cmp = btc(src, btfm),
+			fn = new Function("var c=5;"+cmp);
+		expect(fn()).to.be.equal(' While OK  While OK  While OK  While OK  While OK ');
+	});
+
+	dsc("substitution", function () {
+		it("should echo", function () {
+			var src = "{{c}}",
+				cmp = btc(src, btfm),
+				fn = new Function("var c='this is a test';"+cmp);
+			expect(fn()).to.be.equal('this is a test');
+		});
+
+		it("should purify", function () {
+			var src = "{{{c}}}",
+				cmp = btc(src, btfm),
+				fn = new Function("var c='<html>';"+cmp);
+			expect(fn()).to.be.equal('&lt;html&gt;');
+		});
+	});
 });

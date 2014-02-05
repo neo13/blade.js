@@ -262,9 +262,18 @@
 
 	//
 	//	Template Catch System
+	//		As the compiling process takes a lot of time and effort we might need a catching system to prevent
+	//		over compiling. [todo]: i also think of a prototype to re-compile just the altered section of template
+	//		but thats a todo. What i have in my mind now is some sort of hashing process[in server side or client side] and
+	//		using `localStoage` in client side and file system for server side.
 	//
-	function TC () {
-
+	function TCS () {
+		//	in client side type of hashing:
+		//		1. get from server as `content-md5` header for client side
+		//		2. Last modified date
+		//		3. Etags if provided
+		//		4. Getting content and using hash on it in client side
+		//	in server side we use native hash implementations
 	}
 
 	//
@@ -278,7 +287,7 @@
 		var 
 		__FM = file_manager,
 
-		raw_text_map,
+		raw_text_map = {},
 
 		//purify function is copied from mustache.js(c)
 		compiled_src = "var _r='',_p=function(v){var _m={'&': '&amp;','<': '&lt;','>': '&gt;','\"': '&quot;',\"\'\": '&#39;','/': '&#x2F;'};return v.replace(/[&<>\"\'\/]/g,function(s){return _m[s];});};",
@@ -434,39 +443,40 @@
 							"@endif",
 							"@unless([\\s\\S]+?)\\)",
 							"@endunless",
-							"@for([\\s\\S]+?)\\)",
+							"@for(?!each)([\\s\\S]+?)\\)",
 							"@endfor",
-							"@foreach([\\s\\S]+?)\\)",
-							"@endforeach",
+							"@foreach([\\s\\S]+?)\\)([\\s\\S]+?)@endforeach",
 							"@while([\\s\\S]+?)\\)",
 							"@endwhile"
 				].join("|"), "g");
 
-				source = source.replace(conditions, function (match, _if, _elseif, _unless, _for, _foreach, _while, offset, string) {
+				source = source.replace(conditions, function (match, _if, _elseif, _unless, _for, _foreach_condition, _foreach_content, _while, offset, string) {
 
 					if (match === "@else") {
 						return "';}else{_r=_r+'";
 					}
-					else if (match === "@endif" || match === "@endunless" || match === "@endfor" || match === "@endforeach" || match === "@endwhile") {
+					else if (match === "@endif" || match === "@endunless" || match === "@endfor" || match === "@endwhile") {
 						return "';}_r=_r+'";
 					}
 					else if ( _elseif ){
-						return "';}else if("+_elseif.clean(/\(/, "")+"){_r=_r+'";	
+						return "';}else if("+_elseif.clean(/\(/, "").replace(/\\\\/g, "")+"){_r=_r+'";	
 					}
 					else if ( _if || _for || _while) {
-						return "';"+match.slice(1,match.length)+"{_r=_r+'";
+						return "';"+match.slice(1,match.length).replace(/\\\\/g, "")+"{_r=_r+'";
 					}
 					else if ( _unless ) {
-						return "';if("+_unless.clean(/\(/, "")+"){_r=_r+'";
+						return "';if("+_unless.clean(/\(/, "").replace(/\\\\/g, "")+"){_r=_r+'";
 					}
 					else{
-						var condition = _foreach.replace(/\(/, ""),
+						//[todo]: this parts need a little more work and god this is a mess :(
+						var condition = _foreach_condition.replace(/\(/, ""),
 							object = condition.split(" as ")[0].replace(/\s+/g, ""),
 							variable = condition.split(" as ")[1].replace(/\s+/g, ""),
-							loop_variable_name = "v"+ Math.round(Math.random() * 100000);
-
-						//[issue]: its been said that for in loop is not good for Array
-						return "';for(var "+loop_variable_name+" in "+ object + "){var "+ variable + "="+ object + "[" + loop_variable_name + "];_r=_r+'";
+							loop_variable_name = "v"+UID(),
+							function_name = "fn"+UID(),
+							function_body = BTC(_foreach_content, __FM),
+							res = "';function "+function_name+"("+variable+"){"+function_body+"};if("+object+" instanceof Array && Array.prototype.forEach){"+object+".forEach(function("+variable+"){_r=_r+"+function_name+"("+variable+");});}else if("+object+" instanceof Array){for("+loop_variable_name+"=0; "+loop_variable_name+"<"+object+".length; "+loop_variable_name+"+=1){_r=_r+"+function_name+"("+object+"["+loop_variable_name+"]);};}else if("+object+" instanceof Object){for("+loop_variable_name+" in "+object+"){_r=_r+"+function_name+"("+object+"["+loop_variable_name+"]);};}else{_r=_r+"+function_name+"("+object+");};_r=_r+'";
+						return res;
 					}
 
 				});
@@ -492,7 +502,7 @@
 
 				text_id = UID();
 
-				raw_text_map[text_id] = raw_text;
+				map[text_id] = raw_text;
 
 				return "${${"+text_id+"}$}$";
 
@@ -506,7 +516,7 @@
 		mapRawText = function (source, map) {
 
 			for (var raw_text in map) {
-				source = source.replace("${${"+raw_text+"}$}$", map[raw_text]);
+				source = source.replace("${${"+raw_text+"}$}$", "';"+map[raw_text]+"_r=_r+'");
 			}
 
 			return source;
